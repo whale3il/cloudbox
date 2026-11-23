@@ -1,0 +1,53 @@
+// PUT /file/:id
+app.put('/file/:id', upload.single('file'), async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const prismaFile = await prisma.file.findUnique({ where: { id: Number(id) } });
+        if (!prismaFile) return res.status(404).json({ message: 'File not found' });
+        if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+
+        // 1️⃣ Upload new file first
+        let result;
+        const mimetype = req.file.mimetype;
+
+        if (mimetype.startsWith('image')) result = await uploadToCloudinaryImage(req.file.buffer, 'uploads');
+        else if (mimetype.startsWith('video')) result = await uploadToCloudinaryVideo(req.file.buffer, 'uploads');
+        else result = await uploadToCloudinarypdf(req.file.buffer, 'uploads');
+
+        // 2️⃣ Delete old file from Cloudinary
+        await cloudinary.uploader.destroy(prismaFile.publicId);
+
+        // 3️⃣ Update MongoDB
+        const mongoFile = await fileModel.findOneAndUpdate(
+            { publicId: prismaFile.publicId },
+            {
+                url: result.secure_url,
+                publicId: result.public_id,
+                filename: req.file.originalname,
+                size: req.file.size,
+            },
+            { new: true }
+        );
+
+        // 4️⃣ Update Prisma
+        const updatedPrismaFile = await prisma.file.update({
+            where: { id: Number(id) },
+            data: {
+                url: result.secure_url,
+                publicId: result.public_id,
+                filename: req.file.originalname,
+                size: req.file.size,
+            },
+        });
+
+        res.status(200).json({ message: 'File updated successfully', mongoFile, updatedPrismaFile });
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+const mongoFile = await fileModel.findOne({ _id: id });
+if (!mongoFile) return res.status(404).json({ message: 'File not found' });

@@ -1,0 +1,85 @@
+app.put('/file', upload.single('file'), async (req, res) => {
+  const public_id = req.body.public_id
+
+  try {
+    const prismaFile = await prisma.file.findUnique({
+      where: { publicId: public_id }
+    })
+
+    if (!prismaFile) {
+      return res.status(400).json({ message: "FILE not found" })
+    }
+
+    const mongofile = await fileModel.findOne({
+      publicId: public_id
+    })
+
+    if (!mongofile) {
+      return res.status(400).json({ message: "FILE not found" })
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" })
+    }
+
+    // ✅ upload new file
+    let result
+
+    if (req.file.mimetype.startsWith('image')) {
+      result = await uploadToCloudinaryImage(req.file.buffer, 'image_uploads')
+    } else if (req.file.mimetype.startsWith('video')) {
+      result = await uploadToCloudinaryVideo(req.file.buffer, 'videos_uploads')
+    } else {
+      result = await uploadToCloudinarypdf(req.file.buffer, 'pdf/csv_uploads')
+    }
+
+    // ✅ detect correct resource type
+    let resourceType = "image"
+
+    if (prismaFile.url.includes("/video/")) {
+      resourceType = "video"
+    } else if (prismaFile.url.includes("/raw/")) {
+      resourceType = "raw"
+    }
+
+    // ✅ delete old file properly
+    const deleteFiles = await cloudinary.uploader.destroy(
+      prismaFile.publicId,
+      { resource_type: resourceType }
+    )
+
+    // ✅ update prisma
+    const updatedPrismaFile = await prisma.file.update({
+      where: { publicId: prismaFile.publicId },
+      data: {
+        url: result.secure_url,
+        publicId: result.public_id,
+        filename: req.file.originalname,
+        size: req.file.size,
+      }
+    })
+
+    // ✅ update mongo safely
+    const updatedMongoFile = await fileModel.findByIdAndUpdate(
+      mongofile._id,
+      {
+        url: result.secure_url,
+        publicId: result.public_id,
+        filename: req.file.originalname,
+        size: req.file.size,
+      },
+      { new: true }
+    )
+
+    return res.status(200).json({
+      message: 'File updated successfully',
+      updatedMongoFile,
+      updatedPrismaFile,
+      deleteFiles
+    })
+
+  } catch (err) {
+    console.log(err)
+    return res.status(500).json({ message: "Server error" })
+  }
+})

@@ -1,0 +1,43 @@
+{
+  "name": "cloud-file-storage",
+  "version": "1.0.0",
+  "description": "CloudBox - a simple cloud file storage app (Express, Cloudinary, MongoDB, PostgreSQL/Prisma, React)",
+  "main": "index.js",
+  "type": "module",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "setup": "npm install && npm --prefix frontend install",
+    "dev": "tsx watch index.js",
+    "start": "tsx index.js",
+    "client": "npm --prefix frontend run dev",
+    "dev:all": "concurrently -n api,web -c blue,green \"npm:dev\" \"npm:client\"",
+    "build:client": "npm --prefix frontend run build",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "postinstall": "prisma generate || echo Prisma client was not generated - run npm run db:generate"
+  },
+  "keywords": ["cloudinary", "multer", "mongodb", "postgresql", "prisma", "react", "vite", "tailwindcss"],
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^25.2.2",
+    "@types/pg": "^8.16.0",
+    "concurrently": "^9.2.0",
+    "prisma": "^7.3.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.3.0",
+    "@prisma/client": "^7.3.0",
+    "@types/multer": "^2.0.0",
+    "cloudinary": "^2.9.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.4",
+    "express": "^5.2.1",
+    "mongoose": "^9.2.0",
+    "multer": "^2.0.2",
+    "pg": "^8.18.0"
+  }
+}

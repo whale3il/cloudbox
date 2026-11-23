@@ -1,0 +1,27 @@
+// DELETE /file/:id
+app.delete('/file/:id', async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        // Find file in Prisma
+        const prismaFile = await prisma.file.findUnique({ where: { id: Number(id) } });
+        if (!prismaFile) return res.status(404).json({ message: 'File not found' });
+
+        // Delete from Cloudinary
+        const cloudResult = await cloudinary.uploader.destroy(prismaFile.publicId);
+        if (cloudResult.result !== 'ok' && cloudResult.result !== 'not found') {
+            return res.status(500).json({ message: 'Failed to delete file from Cloudinary' });
+        }
+
+        // Delete from MongoDB
+        await fileModel.deleteOne({ publicId: prismaFile.publicId });
+
+        // Delete from Prisma
+        await prisma.file.delete({ where: { id: Number(id) } });
+
+        res.status(200).json({ message: 'File deleted successfully' });
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ error: err.message });
+    }
+});
